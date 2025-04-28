@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Segmentation Dashboard</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #343a40;
+        }
+        .navbar {
+            background-color: #3a6ea5;
+        }
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .card {
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .card-header {
+            font-weight: bold;
+            background-color: #eef2f7;
+        }
+        .btn-primary {
+            background-color: #3a6ea5;
+            border-color: #3a6ea5;
+        }
+        .btn-primary:hover {
+            background-color: #2d5a88;
+            border-color: #2d5a88;
+        }
+        .btn-success {
+            background-color: #28a745;
+            border-color: #28a745;
+        }
+        .btn-success:hover {
+            background-color: #218838;
+            border-color: #218838;
+        }
+        .cluster-info {
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+            border-left: 5px solid #3a6ea5;
+        }
+        #visualization-container img {
+            max-width: 100%;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .step {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #e9ecef;
+            margin: 0 5px;
+            position: relative;
+        }
+        .step.active {
+            background-color: #3a6ea5;
+            color: white;
+        }
+        .step.completed {
+            background-color: #28a745;
+            color: white;
+        }
+        .step:not(:last-child):after {
+            content: "";
+            position: absolute;
+            right: -15px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 2px;
+            background-color: #ced4da;
+        }
+        .feature-selector {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            padding: 10px;
+        }
+        #loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        #error-alert {
+            display: none;
+        }
+        #cluster-profiles-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            margin: 2px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-users-cog me-2"></i>
+                Customer Segmentation Dashboard
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#aboutModal">
+                            <i class="fas fa-info-circle me-1"></i> About
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#helpModal">
+                            <i class="fas fa-question-circle me-1"></i> Help
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mt-4">
+        <!-- Alert for errors -->
+        <div class="alert alert-danger alert-dismissible fade show" id="error-alert" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <span id="error-message"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+
+        <!-- Step Indicators -->
+        <div class="step-indicator mb-4">
+            <div class="step active" id="step-1">
+                <i class="fas fa-file-upload me-2"></i> Upload Data
+            </div>
+            <div class="step" id="step-2">
+                <i class="fas fa-filter me-2"></i> Preprocess
+            </div>
+            <div class="step" id="step-3">
+                <i class="fas fa-cogs me-2"></i> Cluster
+            </div>
+            <div class="step" id="step-4">
+                <i class="fas fa-chart-pie me-2"></i> Analyze
+            </div>
+        </div>
+
+        <!-- Step 1: Data Upload -->
+        <div class="row" id="upload-section">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-file-upload me-2"></i> Data Upload
+                    </div>
+                    <div class="card-body">
+                        <p>Upload your customer data in CSV or Excel format:</p>
+                        <form id="upload-form" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <input class="form-control" type="file" id="file-input" accept=".csv, .xls, .xlsx">
+                                <small class="text-muted">Supported formats: CSV, Excel (.xls, .xlsx)</small>
+                            </div>
+                            <button type="button" id="upload-btn" class="btn btn-primary">
+                                <i class="fas fa-upload me-2"></i> Upload Data
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Data Preprocessing -->
+        <div class="row" id="preprocess-section" style="display: none;">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-filter me-2"></i> Data Preprocessing
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Data Preview</h5>
+                                <div class="table-container">
+                                    <table class="table table-sm table-bordered table-hover" id="data-preview-table">
+                                        <thead>
+                                            <tr>
+                                                <th>#</th>
+                                                <!-- Columns will be added dynamically -->
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Rows will be added dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <p><small class="text-muted">Showing first 5 rows</small></p>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Select Features for Clustering</h5>
+                                <div class="feature-selector mb-3" id="feature-selector">
+                                    <!-- Features will be added dynamically -->
+                                </div>
+                                <button type="button" id="preprocess-btn" class="btn btn-primary">
+                                    <i class="fas fa-cog me-2"></i> Preprocess Data
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Clustering -->
+        <div class="row" id="clustering-section" style="display: none;">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-cogs me-2"></i> Clustering
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Clustering Algorithm</h5>
+                                <div class="mb-3">
+                                    <select class="form-select" id="algorithm-select">
+                                        <option value="kmeans">K-Means Clustering</option>
+                                        <option value="hierarchical">Hierarchical Clustering</option>
+                                        <option value="dbscan">DBSCAN Clustering</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Parameters for K-Means -->
+                                <div id="kmeans-params">
+                                    <div class="mb-3">
+                                        <label for="kmeans-k" class="form-label">Number of Clusters (K)</label>
+                                        <input type="number" class="form-control" id="kmeans-k" value="3" min="2" max="10">
+                                    </div>
+                                    <button type="button" id="find-optimal-k" class="btn btn-outline-secondary mb-3">
+                                        <i class="fas fa-search me-2"></i> Find Optimal K
+                                    </button>
+                                </div>
+                                
+                                <!-- Parameters for Hierarchical -->
+                                <div id="hierarchical-params" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="hierarchical-k" class="form-label">Number of Clusters</label>
+                                        <input type="number" class="form-control" id="hierarchical-k" value="3" min="2" max="10">
+                                    </div>
+                                </div>
+                                
+                                <!-- Parameters for DBSCAN -->
+                                <div id="dbscan-params" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="dbscan-eps" class="form-label">Epsilon (ε)</label>
+                                        <input type="number" class="form-control" id="dbscan-eps" value="0.5" min="0.1" step="0.1">
+                                        <small class="text-muted">Maximum distance between two samples to be considered as neighbors</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="dbscan-min-samples" class="form-label">Minimum Samples</label>
+                                        <input type="number" class="form-control" id="dbscan-min-samples" value="5" min="1">
+                                        <small class="text-muted">Minimum number of samples in a neighborhood to form a core point</small>
+                                    </div>
+                                </div>
+                                
+                                <button type="button" id="cluster-btn" class="btn btn-primary">
+                                    <i class="fas fa-play me-2"></i> Perform Clustering
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Data Statistics</h5>
+                                <div id="data-stats">
+                                    <!-- Stats will be added dynamically -->
+                                    <p>Preprocess data to see statistics</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: Results and Analysis -->
+        <div class="row" id="results-section" style="display: none;">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-chart-pie me-2"></i> Clustering Results
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-12 mb-4" id="visualization-container">
+                                <!-- Visualization will be added dynamically -->
+                                <p class="text-center">Run clustering to see visualization</p>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Cluster Summary</h5>
+                                <div id="cluster-summary">
+                                    <!-- Cluster summary will be added dynamically -->
+                                    <p>Run clustering to see results</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Cluster Profiles</h5>
+                                <div id="cluster-profiles-container">
+                                    <!-- Cluster profiles will be added dynamically -->
+                                    <p>Run clustering to see profiles</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-4">
+                            <div class="col-md-12 text-center">
+                                <button type="button" id="export-btn" class="btn btn-success me-2">
+                                    <i class="fas fa-download me-2"></i> Export Results (CSV)
+                                </button>
+                                <button type="button" id="weka-btn" class="btn btn-outline-primary me-2">
+                                    <i class="fas fa-file-export me-2"></i> Export for Weka
+                                </button>
+                                <button type="button" id="restart-btn" class="btn btn-outline-secondary">
+                                    <i class="fas fa-redo me-2"></i> Start Over
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Processing, please wait...</p>
+        </div>
+    </div>
+
+    <!-- About Modal -->
+    <div class="modal fade" id="aboutModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">About Customer Segmentation</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>This customer segmentation dashboard allows you to:</p>
+                    <ul>
+                        <li>Upload your customer data in CSV or Excel format</li>
+                        <li>Preprocess and clean your data for analysis</li>
+                        <li>Segment your customers using various clustering algorithms</li>
+                        <li>Visualize the segments for better understanding</li>
+                        <li>Export the results for further analysis</li>
+                    </ul>
+                    <p>Customer segmentation helps you understand your customer base better and develop targeted marketing strategies.</p>
+                    <p><strong>Version:</strong> 1.0</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="modal fade" id="helpModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">How to Use This Dashboard</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>Step 1: Data Upload</h6>
+                    <p>Upload your customer data file in CSV or Excel format. The file should contain customer attributes like demographics, purchase history, behavior, etc.</p>
+                    
+                    <h6>Step 2: Data Preprocessing</h6>
+                    <p>Select the features (columns) you want to use for segmentation. The system will automatically handle missing values and standardize the data.</p>
+                    
+                    <h6>Step 3: Clustering</h6>
+                    <p>Choose a clustering algorithm and set its parameters:</p>
+                    <ul>
+                        <li><strong>K-Means:</strong> Fast and simple algorithm that groups data into K clusters. You need to specify K (number of clusters).</li>
+                        <li><strong>Hierarchical Clustering:</strong> Creates a tree of clusters. You specify the number of clusters to extract.</li>
+                        <li><strong>DBSCAN:</strong> Density-based clustering that can find clusters of arbitrary shape. Set the epsilon (neighborhood distance) and minimum points parameters.</li>
+                    </ul>
+                    <p>Use the "Find Optimal K" function to help determine the best number of clusters for K-Means.</p>
+                    
+                    <h6>Step 4: Results and Analysis</h6>
+                    <p>Examine the visualization and cluster profiles to understand your customer segments. You can:</p>
+                    <ul>
+                        <li>View the cluster visualization (PCA-reduced for 2D display)</li>
+                        <li>See cluster sizes and characteristics</li>
+                        <li>Export the results as CSV for further analysis</li>
+                        <li>Export as a Weka file for advanced analysis in the Weka tool</li>
+                    </ul>
+                    
+                    <h6>Tips for Good Segmentation</h6>
+                    <ul>
+                        <li>Use relevant customer attributes (behaviors are often more useful than demographics)</li>
+                        <li>Compare different algorithms and parameters</li>
+                        <li>Look for silhouette scores above 0.5 for good separation</li>
+                        <li>The best segmentation is one that leads to actionable marketing strategies</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap and jQuery JS -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- App JS -->
+    <script src="static/js/main.js"></script>
+</body>
+</html>
